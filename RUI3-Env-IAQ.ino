@@ -143,11 +143,11 @@ void sendCallback(int32_t status)
 uint8_t UserBattLevel(void)
 {
 	// on USB return 0
-	if (NRF_POWER->USBREGSTATUS == 3)
-	{
-		MYLOG("BAT", "On USB");
-		return 0;
-	}
+	// if (NRF_POWER->USBREGSTATUS == 3)
+	// {
+	// 	MYLOG("BAT", "On USB");
+	// 	return 0;
+	// }
 
 	// else calculate the battery status
 	float batt_voltage = api.system.bat.get();
