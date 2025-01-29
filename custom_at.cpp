@@ -36,7 +36,6 @@ custom_param_s custom_parameters;
 // Forward declarations
 int interval_send_handler(SERIAL_PORT port, char *cmd, stParam *param);
 int status_handler(SERIAL_PORT port, char *cmd, stParam *param);
-int rtc_command_handler(SERIAL_PORT port, char *cmd, stParam *param);
 int iaq_interval_handler(SERIAL_PORT port, char *cmd, stParam *param);
 
 /**

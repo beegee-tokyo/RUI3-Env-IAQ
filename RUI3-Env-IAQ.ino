@@ -168,7 +168,7 @@ void setup()
 	// Delay for 5 seconds to give the chance for AT+BOOT
 	delay(5000);
 
-	api.system.firmwareVersion.set("RUI3-Clock-V1.0.0");
+	api.system.firmwareVersion.set("RUI3-IAQ-V1.0.0");
 
 	Serial.println("RAKwireless RUI3 Node");
 	Serial.println("------------------------------------------------------");
