@@ -88,18 +88,12 @@ int interval_send_handler(SERIAL_PORT port, char *cmd, stParam *param)
 
 		custom_parameters.send_interval = new_send_freq * 1000;
 
-		// MYLOG("AT_CMD", "New interval %ld ms", custom_parameters.send_interval);
-		// Change repeat time in millis task manager
-		mtmMain.SetIntervalTime(sensor_handler, custom_parameters.send_interval);
-		// Stop the timer if interval is 0
-		if (custom_parameters.send_interval == 0)
+		if (custom_parameters.send_interval != 0)
 		{
-			mtmMain.SetState(sensor_handler, false);
+			// Start a timer.
+			api.system.timer.start(RAK_TIMER_1, custom_parameters.send_interval, NULL);
 		}
-		else
-		{
-			mtmMain.SetState(sensor_handler, true);
-		}
+
 		// Save custom settings if needed
 		if (old_send_freq != custom_parameters.send_interval)
 		{
@@ -164,17 +158,10 @@ int iaq_interval_handler(SERIAL_PORT port, char *cmd, stParam *param)
 
 		custom_parameters.iaq_interval = new_send_freq * 1000;
 
-		// MYLOG("AT_CMD", "New interval %ld ms", custom_parameters.send_interval);
-		// Change repeat time in millis task manager
-		mtmMain.SetIntervalTime(read_bme680, custom_parameters.iaq_interval);
-		// Stop the timer if interval is 0
-		if (custom_parameters.iaq_interval == 0)
+		if (custom_parameters.iaq_interval != 0)
 		{
-			mtmMain.SetState(read_bme680, false);
-		}
-		else
-		{
-			mtmMain.SetState(read_bme680, true);
+			// Start a timer.
+			api.system.timer.start(RAK_TIMER_0, custom_parameters.iaq_interval, NULL);
 		}
 
 		// Save custom settings if needed

@@ -35,10 +35,9 @@
 #include "app.h"
 
 #include <Wire.h>
-#include <Adafruit_Sensor.h>
-#include "Adafruit_BME680.h"
+#include "src/rak1906.h"
 
-Adafruit_BME680 bme(&Wire);
+rak1906 bme;
 
 bool has_rak1906 = false;
 
@@ -57,48 +56,48 @@ float volatile g_last_humidity = 0.0;
 float volatile g_last_pressure = 0.0;
 float volatile g_last_gas = 0.0;
 float volatile g_last_air_quality = 0.0;
-
+float volatile g_last_iaq = 0.0;
+/**
+ * @brief Initialize BME680
+ * 
+ * @return true sensor found
+ * @return false no sensor
+ */
 bool init_rak1906(void)
 {
 	Wire.begin();
-	if (!bme.begin(0x76))
+	if (!bme.init())
 	{
 		MYLOG("BME", "Could not find a valid BME680 sensor, check wiring!");
 		return false;
 	}
 
 	// Set up oversampling and filter initialization
-	bme.setTemperatureOversampling(BME680_OS_2X);
-	bme.setHumidityOversampling(BME680_OS_2X);
-	bme.setPressureOversampling(BME680_OS_2X);
-	bme.setIIRFilterSize(BME680_FILTER_SIZE_3);
-	bme.setGasHeater(320, 150); // 320°C for 150 ms
+	bme.setOversampling(TemperatureSensor, Oversample8);
+	bme.setOversampling(HumiditySensor, Oversample2);
+	bme.setOversampling(PressureSensor, Oversample4);
+	bme.setIIRFilter(IIR4);
+	bme.setGas(320, 150); // 320°C for 150 ms
 	// Now run the sensor for a burn-in period, then use combination of relative humidity and gas resistance to estimate indoor air quality as a percentage.
 	GetGasReference();
 	return true;
 }
 
-void get_bme680(void)
+/**
+ * @brief Read data from BME680
+ * 
+ */
+void read_bme680(void *)
 {
-	if (!bme.performReading())
+	if (!bme.update())
 	{
-		MYLOG("BME","get_bme680() failed");
+		MYLOG("BME", "BME reading timeout");
+		return;
 	}
-	g_last_temperature = bme.readTemperature();
-	g_last_humidity = bme.readHumidity();
-	g_last_pressure = bme.readPressure();
-	MYLOG("BME", "T = %.2f", g_last_temperature);
-	MYLOG("BME", "H = %.2f", g_last_humidity);
-	MYLOG("BME", "P = %.2f", g_last_pressure / 100);
-}
-
-void read_bme680(void)
-{
-	bme.performReading();
-	g_last_temperature = bme.readTemperature();
-	g_last_humidity = bme.readHumidity();
-	g_last_pressure = bme.readPressure();
-	g_last_gas = (float)(bme.readGas());
+	g_last_temperature = bme.temperature();
+	g_last_humidity = bme.humidity();
+	g_last_pressure = bme.pressure();
+	g_last_gas = bme.gas() * 1000.0;
 
 	if (g_last_humidity >= 38 && g_last_humidity <= 42)
 		hum_score = 0.25 * 100; // Humidity +/-5% around optimum
@@ -113,10 +112,7 @@ void read_bme680(void)
 		}
 	}
 
-	// if ((getgasreference_count++) % 10 == 0)
-	{
-		GetGasReference();
-	}
+	GetGasReference();
 
 	if (gas_reference > gas_upper_limit)
 		gas_reference = gas_upper_limit;
@@ -126,24 +122,29 @@ void read_bme680(void)
 
 	// MYLOG("BME", "G %.2f H %.2f", gas_score, hum_score);
 	g_last_air_quality = hum_score + gas_score;
+	g_last_iaq = (100 - g_last_air_quality) * 5.0;
 
 	MYLOG("BME", "T = %.2f", g_last_temperature);
 	MYLOG("BME", "H = %.2f", g_last_humidity);
-	MYLOG("BME", "P = %.2f", g_last_pressure / 100);
+	MYLOG("BME", "P = %.2f", g_last_pressure);
 	MYLOG("BME", "Gas = %.2f", g_last_gas);
-	MYLOG("BME", "IAQ score = %d", (uint16_t)((100 - g_last_air_quality) * 5));
+	MYLOG("BME", "IAQ score = %.2f", g_last_iaq);
 }
 
+/**
+ * @brief Update gas reference
+ * 
+ */
 void GetGasReference()
 {
 	// Now run the sensor for a burn-in period, then use combination of relative humidity and gas resistance to estimate indoor air quality as a percentage.
 	// MYLOG("BME", "Getting a new gas reference value");
-	// int readings = 10;
-	int readings = 3;
+	int readings = 10;
+	// int readings = 3;
 	for (int i = 1; i <= readings; i++)
 	{
 		// read gas for 10 x 0.150mS = 1.5secs
-		gas_reference += bme.readGas();
+		gas_reference += (bme.gas() * 1000.0);
 	}
 	gas_reference = gas_reference / readings;
 }

@@ -37,10 +37,8 @@ bool init_status_at(void);
 bool init_interval_at(void);
 bool get_at_setting(void);
 bool save_at_setting(void);
-bool init_rtc_at(void);
 bool init_iaq_interval_at(void);
-int rtc_command_handler(SERIAL_PORT port, char *cmd, stParam *param);
-void sensor_handler(void);
+void sensor_handler(void *);
 
 extern uint8_t sync_time_status;
 
@@ -66,8 +64,7 @@ extern custom_param_s custom_parameters;
 
 // RAK1906
 bool init_rak1906(void);
-void read_bme680(void);
-void get_bme680(void);
+void read_bme680(void *);
 void GetGasReference();
 extern bool has_rak1906;
 extern volatile float g_last_temperature;
@@ -75,7 +72,4 @@ extern volatile float g_last_humidity;
 extern volatile float g_last_pressure;
 extern volatile float g_last_gas;
 extern volatile float g_last_air_quality;
-
-// Millis Task Manager
-#include "MillisTaskManager.h"
-extern MillisTaskManager mtmMain;
+extern float volatile g_last_iaq;

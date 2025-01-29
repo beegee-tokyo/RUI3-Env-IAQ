@@ -25,13 +25,12 @@ This little PoC is building a low power IAQ sensor with the Bosch BME680 sensor.
 | ----------------- | -------------------------------------------------------------------------------------------------------- |
 | RUI3 BSP          | [RUI3 API](https://docs.rakwireless.com/product-categories/software-apis-and-libraries/rui3/arduino-api) |
 | IAQ algorithm     | [IAQ algorithm](https://github.com/G6EJD/BME680-Example)                                                 |
-| MillisTaskManager | Unknown source and unknown license                                                                       |
 
 ----
 
 # Function
-The code is based on my low power RUI3 example. Different to the example, it is not complete based on timers. In this use case I am using a task manager that handles the readings from the Bosch BME680 sensor in a configurable interval.    
-Sending the sensor data in a configurable interval is still handled by a timer.    
+The code is based on my low power RUI3 example. It is complete based on timers. One timer handles the readings from the Bosch BME680 sensor in a configurable interval.    
+The second timer handles sending the sensor data in a configurable interval.    
 
 For the IAQ, here the quote from the original code provider David Bird:    
 

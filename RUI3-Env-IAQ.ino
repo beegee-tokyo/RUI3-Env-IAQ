@@ -1,9 +1,9 @@
 /**
  * @file RUI3-EPD-Clock.ino
  * @author Bernd Giesecke (bernd@giesecke.tk)
- * @brief RUI3 clock on 4.2" EPD display
+ * @brief RUI3 IAQ sensor based on Bosch BME680
  * @version 0.1
- * @date 2024-04-15
+ * @date 2025-01-29
  *
  * @copyright Copyright (c) 2024
  *
@@ -56,8 +56,6 @@ uint8_t set_fPort = 2;
 WisCayenne g_solution_data(255);
 
 uint8_t sync_time_status = 0;
-
-MillisTaskManager mtmMain;
 
 /**
  * @brief Callback after join request cycle
@@ -215,30 +213,22 @@ void setup()
 
 	api.lorawan.join(1, 1, 30, 10);
 
-	// Initialize tasks
+	// Initialize timers
 	if (has_rak1906)
 	{
-		mtmMain.Register(read_bme680, custom_parameters.iaq_interval); // Read BME680 every iaq_interval seconds
-		// Stop the timer if interval is 0
-		if (custom_parameters.iaq_interval == 0)
+		api.system.timer.create(RAK_TIMER_0, read_bme680, RAK_TIMER_PERIODIC);
+		if (custom_parameters.iaq_interval != 0)
 		{
-			mtmMain.SetState(read_bme680, false);
-		}
-		else
-		{
-			mtmMain.SetState(read_bme680, true);
+			// Start a timer.
+			api.system.timer.start(RAK_TIMER_0, custom_parameters.iaq_interval, NULL);
 		}
 	}
 
-	mtmMain.Register(sensor_handler, custom_parameters.send_interval); // Send interval task, depending on the settings
-	// Stop the timer if interval is 0
-	if (custom_parameters.send_interval == 0)
+	api.system.timer.create(RAK_TIMER_1, sensor_handler, RAK_TIMER_PERIODIC);
+	if (custom_parameters.send_interval != 0)
 	{
-		mtmMain.SetState(sensor_handler, false);
-	}
-	else
-	{
-		mtmMain.SetState(sensor_handler, true);
+		// Start a timer.
+		api.system.timer.start(RAK_TIMER_1, custom_parameters.send_interval, NULL);
 	}
 
 	// Enable Timerequest
@@ -254,7 +244,7 @@ void setup()
 	api.ble.advertise.start(30);
 #endif
 
-	// If already joined, send a first packet to get the time
+	// If already joined, send a first packet
 	if (api.lorawan.njs.get())
 	{
 		// Enable Timerequest
@@ -276,12 +266,12 @@ void setup()
  * g_send_repeat_time milliseconds.
  *
  */
-void sensor_handler(void)
+void sensor_handler(void *)
 {
 	// MYLOG("UPLINK", "Start");
 	digitalWrite(LED_BLUE, HIGH);
 
-	// if (api.lorawan.nwm.get() == 1)
+	if (api.lorawan.nwm.get() == 1)
 	{
 		// Check if the node has joined the network
 		if (!api.lorawan.njs.get())
@@ -300,8 +290,8 @@ void sensor_handler(void)
 	// Add BME680 data
 	g_solution_data.addTemperature(LPP_CHANNEL_TEMP_2, g_last_temperature);
 	g_solution_data.addRelativeHumidity(LPP_CHANNEL_HUMID_2, g_last_humidity);
-	g_solution_data.addBarometricPressure(LPP_CHANNEL_PRESS_2, g_last_pressure / 100.0);
-	g_solution_data.addAnalogInput(LPP_CHANNEL_GAS_2, (100 - g_last_air_quality) * 5);
+	g_solution_data.addBarometricPressure(LPP_CHANNEL_PRESS_2, g_last_pressure);
+	g_solution_data.addVoc_index(LPP_CHANNEL_GAS_2, (uint32_t)g_last_iaq);
 
 	// Send the packet
 	send_packet();
@@ -315,8 +305,8 @@ void sensor_handler(void)
  */
 void loop()
 {
-	// Check it tasks need to run
-	mtmMain.Running(millis());
+	// Sleep always
+	api.system.sleep.all();
 }
 
 /**
