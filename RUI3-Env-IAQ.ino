@@ -132,8 +132,8 @@ void sendCallback(int32_t status)
 	tx_active = false;
 }
 
-#include "service_lora.h"
-#include "service_lora.c"
+//#include "service_lora.h"
+//#include "service_lora.c"
 /**
  * @brief Callback for LoRaMAC stack to get battery level
  *   Requires changes in the RUI3 files
