@@ -83,14 +83,14 @@ void joinCallback(int32_t status)
  */
 void receiveCallback(SERVICE_LORA_RECEIVE_T *data)
 {
-// 	MYLOG("RX-CB", "RX, port %d, DR %d, RSSI %d, SNR %d", data->Port, data->RxDatarate, data->Rssi, data->Snr);
-// #if MY_DEBUG > 0
-// 	for (int i = 0; i < data->BufferSize; i++)
-// 	{
-// 		Serial.printf("%02X", data->Buffer[i]);
-// 	}
-// 	Serial.print("\r\n");
-// #endif
+	// 	MYLOG("RX-CB", "RX, port %d, DR %d, RSSI %d, SNR %d", data->Port, data->RxDatarate, data->Rssi, data->Snr);
+	// #if MY_DEBUG > 0
+	// 	for (int i = 0; i < data->BufferSize; i++)
+	// 	{
+	// 		Serial.printf("%02X", data->Buffer[i]);
+	// 	}
+	// 	Serial.print("\r\n");
+	// #endif
 	tx_active = false;
 }
 
@@ -132,8 +132,8 @@ void sendCallback(int32_t status)
 	tx_active = false;
 }
 
-//#include "service_lora.h"
-//#include "service_lora.c"
+// #include "service_lora.h"
+// #include "service_lora.c"
 /**
  * @brief Callback for LoRaMAC stack to get battery level
  *   Requires changes in the RUI3 files
@@ -142,14 +142,7 @@ void sendCallback(int32_t status)
  */
 uint8_t UserBattLevel(void)
 {
-	// on USB return 0
-	// if (NRF_POWER->USBREGSTATUS == 3)
-	// {
-	// 	MYLOG("BAT", "On USB");
-	// 	return 0;
-	// }
-
-	// else calculate the battery status
+	// calculate the battery status
 	float batt_voltage = api.system.bat.get();
 	for (int idx = 0; idx < 10; idx++)
 	{
@@ -158,6 +151,19 @@ uint8_t UserBattLevel(void)
 	batt_voltage = batt_voltage / 11;
 	batt_voltage *= 1000;
 
+#ifdef _VARIANT_RAK4630_
+	// on USB return 0
+	if (NRF_POWER->USBREGSTATUS == 3)
+	{
+		MYLOG("BAT", "On USB");
+		return 0;
+	}
+#else
+	if (batt_voltage > 4190) // Assume USB when higher than 4190mV
+	{
+		return 0;
+	}
+#endif
 	uint8_t lora_batt = batt_voltage * 255 / 4200;
 
 	MYLOG("BAT", "Calculated %d from %.2fmV", lora_batt, batt_voltage);
@@ -247,15 +253,15 @@ void setup()
 	api.lorawan.join(1, 1, 30, 10);
 
 	// Initialize timers
-	if (has_rak1906)
-	{
-		api.system.timer.create(RAK_TIMER_0, read_bme680, RAK_TIMER_PERIODIC);
-		if (custom_parameters.iaq_interval != 0)
-		{
-			// Start a timer.
-			api.system.timer.start(RAK_TIMER_0, custom_parameters.iaq_interval, NULL);
-		}
-	}
+	// if (has_rak1906)
+	// {
+	// 	api.system.timer.create(RAK_TIMER_0, read_bme680, RAK_TIMER_PERIODIC);
+	// 	if (custom_parameters.iaq_interval != 0)
+	// 	{
+	// 		// Start a timer.
+	// 		api.system.timer.start(RAK_TIMER_0, custom_parameters.iaq_interval, NULL);
+	// 	}
+	// }
 
 	api.system.timer.create(RAK_TIMER_1, sensor_handler, RAK_TIMER_PERIODIC);
 	if (custom_parameters.send_interval != 0)
@@ -313,6 +319,9 @@ void sensor_handler(void *)
 			return;
 		}
 	}
+
+	// Get current sensor values
+	read_bme680(NULL);
 
 	// Clear payload
 	g_solution_data.reset();
