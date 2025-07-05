@@ -269,21 +269,21 @@ int status_handler(SERIAL_PORT port, char *cmd, stParam *param)
 						  key_eui[0], key_eui[1], key_eui[2], key_eui[3]);
 			}
 		}
-		// else if (nw_mode == 0)
-		// {
-		// 	AT_PRINTF("Frequency = %d", api.lora.pfreq.get());
-		// 	AT_PRINTF("SF = %d", api.lora.psf.get());
-		// 	AT_PRINTF("BW = %d", api.lora.pbw.get());
-		// 	AT_PRINTF("CR = %d", api.lora.pcr.get());
-		// 	AT_PRINTF("Preamble length = %d", api.lora.ppl.get());
-		// 	AT_PRINTF("TX power = %d", api.lora.ptp.get());
-		// }
-		// else
-		// {
-		// 	AT_PRINTF("Frequency = %d", api.lora.pfreq.get());
-		// 	AT_PRINTF("Bitrate = %d", api.lora.pbr.get());
-		// 	AT_PRINTF("Deviaton = %d", api.lora.pfdev.get());
-		// }
+		else if (nw_mode == 0)
+		{
+			AT_PRINTF("Frequency = %d", api.lora.pfreq.get());
+			AT_PRINTF("SF = %d", api.lora.psf.get());
+			AT_PRINTF("BW = %d", api.lora.pbw.get());
+			AT_PRINTF("CR = %d", api.lora.pcr.get());
+			AT_PRINTF("Preamble length = %d", api.lora.ppl.get());
+			AT_PRINTF("TX power = %d", api.lora.ptp.get());
+		}
+		else
+		{
+			AT_PRINTF("Frequency = %d", api.lora.pfreq.get());
+			AT_PRINTF("Bitrate = %d", api.lora.pbr.get());
+			AT_PRINTF("Deviaton = %d", api.lora.pfdev.get());
+		}
 	}
 	else
 	{

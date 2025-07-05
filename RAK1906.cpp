@@ -59,7 +59,7 @@ float volatile g_last_air_quality = 0.0;
 float volatile g_last_iaq = 0.0;
 /**
  * @brief Initialize BME680
- * 
+ *
  * @return true sensor found
  * @return false no sensor
  */
@@ -85,7 +85,7 @@ bool init_rak1906(void)
 
 /**
  * @brief Read data from BME680
- * 
+ *
  */
 void read_bme680(void *)
 {
@@ -133,7 +133,7 @@ void read_bme680(void *)
 
 /**
  * @brief Update gas reference
- * 
+ *
  */
 void GetGasReference()
 {

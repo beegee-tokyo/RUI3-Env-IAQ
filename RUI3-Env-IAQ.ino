@@ -56,6 +56,8 @@ uint8_t set_fPort = 2;
 WisCayenne g_solution_data(255);
 
 uint8_t sync_time_status = 0;
+/** Device ID, created from DevEUI, used in LoRa P2P packets */
+uint8_t dev_id[8];
 
 /**
  * @brief Callback after join request cycle
@@ -132,6 +134,41 @@ void sendCallback(int32_t status)
 	tx_active = false;
 }
 
+/**
+ * @brief LoRa P2P callback if a packet was received
+ *
+ * @param data pointer to the data with the received data
+ */
+void recv_cb(rui_lora_p2p_recv_t data)
+{
+	MYLOG("RX-P2P-CB", "P2P RX, RSSI %d, SNR %d", data.Rssi, data.Snr);
+	for (int i = 0; i < data.BufferSize; i++)
+	{
+		Serial.printf("%02X", data.Buffer[i]);
+	}
+	Serial.print("\r\n");
+}
+
+/**
+ * @brief LoRa P2P callback if a packet was sent
+ *
+ */
+void send_cb(void)
+{
+	MYLOG("TX-P2P-CB", "P2P TX finished");
+	digitalWrite(LED_BLUE, LOW);
+}
+
+/**
+ * @brief LoRa P2P callback for CAD result
+ *
+ * @param result true if activity was detected, false if no activity was detected
+ */
+void cad_cb(bool result)
+{
+	MYLOG("CAD-P2P-CB", "P2P CAD reports %s", result ? "activity" : "no activity");
+}
+
 // #include "service_lora.h"
 // #include "service_lora.c"
 /**
@@ -177,19 +214,30 @@ uint8_t UserBattLevel(void)
  */
 void setup()
 {
-	// Setup callbacks
-	g_confirmed_mode = api.lorawan.cfm.get();
+	// Setup for LoRaWAN
+	if (api.lorawan.nwm.get() == 1)
+	{
+		g_confirmed_mode = api.lorawan.cfm.get();
 
-	g_confirmed_retry = api.lorawan.rety.get();
+		g_confirmed_retry = api.lorawan.rety.get();
 
-	g_data_rate = api.lorawan.dr.get();
+		g_data_rate = api.lorawan.dr.get();
 
-	// Setup the callbacks for joined and send finished
-	api.lorawan.registerRecvCallback(receiveCallback);
-	api.lorawan.registerSendCallback(sendCallback);
-	api.lorawan.registerJoinCallback(joinCallback);
-	api.lorawan.registerLinkCheckCallback(linkcheckCallback);
-	api.lorawan.registerTimereqCallback(timeReqCallback);
+		// Setup the callbacks for joined and send finished
+		api.lorawan.registerRecvCallback(receiveCallback);
+		api.lorawan.registerSendCallback(sendCallback);
+		api.lorawan.registerJoinCallback(joinCallback);
+		api.lorawan.registerLinkCheckCallback(linkcheckCallback);
+		api.lorawan.registerTimereqCallback(timeReqCallback);
+	}
+	else // Setup for LoRa P2P
+	{
+		api.lora.registerPRecvCallback(recv_cb);
+		api.lora.registerPSendCallback(send_cb);
+		api.lora.registerPSendCADCallback(cad_cb);
+		api.lorawan.deui.get(dev_id, 8);
+		MYLOG("SETUP", "P2P Device Address: %02X%02X%02X%02X", dev_id[4], dev_id[5], dev_id[6], dev_id[7]);
+	}
 
 	pinMode(LED_GREEN, OUTPUT);
 	digitalWrite(LED_GREEN, HIGH);
@@ -250,18 +298,14 @@ void setup()
 
 	digitalWrite(LED_GREEN, LOW);
 
-	api.lorawan.join(1, 1, 30, 10);
-
-	// Initialize timers
-	// if (has_rak1906)
-	// {
-	// 	api.system.timer.create(RAK_TIMER_0, read_bme680, RAK_TIMER_PERIODIC);
-	// 	if (custom_parameters.iaq_interval != 0)
-	// 	{
-	// 		// Start a timer.
-	// 		api.system.timer.start(RAK_TIMER_0, custom_parameters.iaq_interval, NULL);
-	// 	}
-	// }
+	if (api.lorawan.nwm.get() == 1)
+	{
+		api.lorawan.join(1, 1, 30, 10);
+	}
+	else
+	{
+		digitalWrite(LED_BLUE, LOW);
+	}
 
 	api.system.timer.create(RAK_TIMER_1, sensor_handler, RAK_TIMER_PERIODIC);
 	if (custom_parameters.send_interval != 0)
@@ -269,9 +313,6 @@ void setup()
 		// Start a timer.
 		api.system.timer.start(RAK_TIMER_1, custom_parameters.send_interval, NULL);
 	}
-
-	// Enable Timerequest
-	api.lorawan.timereq.set(1);
 
 	// Enable low power mode
 	api.system.lpm.set(1);
@@ -283,12 +324,9 @@ void setup()
 	api.ble.advertise.start(30);
 #endif
 
-	// If already joined, send a first packet
-	if (api.lorawan.njs.get())
+	// If already joined or on P2P, send a first packet
+	if (api.lorawan.njs.get() || (api.lorawan.nwm.get() == 0))
 	{
-		// Enable Timerequest
-		// api.lorawan.timereq.set(1);
-
 		// Clear payload
 		g_solution_data.reset();
 
@@ -307,7 +345,7 @@ void setup()
  */
 void sensor_handler(void *)
 {
-	// MYLOG("UPLINK", "Start");
+	MYLOG("UPLINK", "Start");
 	digitalWrite(LED_BLUE, HIGH);
 
 	if (api.lorawan.nwm.get() == 1)
@@ -333,7 +371,7 @@ void sensor_handler(void *)
 	g_solution_data.addTemperature(LPP_CHANNEL_TEMP_2, g_last_temperature);
 	g_solution_data.addRelativeHumidity(LPP_CHANNEL_HUMID_2, g_last_humidity);
 	g_solution_data.addBarometricPressure(LPP_CHANNEL_PRESS_2, g_last_pressure);
-	g_solution_data.addVoc_index(LPP_CHANNEL_GAS_2, (uint32_t)g_last_iaq);
+	g_solution_data.addAnalogInput(LPP_CHANNEL_GAS_2, g_last_iaq);
 
 	// Send the packet
 	send_packet();
@@ -361,28 +399,49 @@ void send_packet(void)
 {
 	// MYLOG("UPLINK", "Sending %d bytes", g_solution_data.getSize());
 
-#if MY_DEBUG > 0
-	uint8_t *packet_buffer = g_solution_data.getBuffer();
+	// #if MY_DEBUG > 0
+	// 	uint8_t *packet_buffer = g_solution_data.getBuffer();
 
-	for (int i = 0; i < g_solution_data.getSize(); i++)
+	// 	for (int i = 0; i < g_solution_data.getSize(); i++)
+	// 	{
+	// 		Serial.printf("%02X", packet_buffer[i]);
+	// 	}
+	// 	Serial.print("\r\n");
+	// #endif
+
+	// Check if it is LoRaWAN
+	if (api.lorawan.nwm.get() == 1)
 	{
-		Serial.printf("%02X", packet_buffer[i]);
-	}
-	Serial.print("\r\n");
-#endif
 
-	// Enable Timerequest
-	api.lorawan.timereq.set(1);
+		// Enable Timerequest
+		api.lorawan.timereq.set(1);
 
-	// Send the packet
-	if (api.lorawan.send(g_solution_data.getSize(), g_solution_data.getBuffer(), set_fPort, g_confirmed_mode, g_confirmed_retry))
-	{
-		// MYLOG("UPLINK", "LPW Packet enqueued");
-		tx_active = true;
+		// Send the packet
+		if (api.lorawan.send(g_solution_data.getSize(), g_solution_data.getBuffer(), set_fPort, g_confirmed_mode, g_confirmed_retry))
+		{
+			// MYLOG("UPLINK", "LPW Packet enqueued");
+			tx_active = true;
+		}
+		else
+		{
+			// MYLOG("UPLINK", "Send failed");
+			tx_active = false;
+		}
 	}
+	// It is P2P
 	else
 	{
-		// MYLOG("UPLINK", "Send failed");
-		tx_active = false;
+		MYLOG("UPLINK", "Send packet with size %d over P2P", g_solution_data.getSize());
+
+		g_solution_data.addDevID(LPP_CHANNEL_DEVID, &dev_id[4]);
+
+		if (api.lora.psend(g_solution_data.getSize(), g_solution_data.getBuffer(), true))
+		{
+			MYLOG("UPLINK", "Packet enqueued");
+		}
+		else
+		{
+			MYLOG("UPLINK", "Send failed");
+		}
 	}
 }
